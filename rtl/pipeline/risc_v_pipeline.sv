@@ -163,6 +163,10 @@ module risc_v_pipeline(
             ex_mem_reg.alu_result <= alu_result;
             ex_mem_reg.regFile_we <= id_ex_reg.regFile_we;
             ex_mem_reg.rd <= id_ex_reg.rd;
+            ex_mem_reg.mem_store_value <= id_ex_reg.rs2_data;
+            ex_mem_reg.mem_write_en <= id_ex_reg.mem_write_en;
+            ex_mem_reg.mem_read_en <= id_ex_reg.mem_read_en;
+
         end
     end
 

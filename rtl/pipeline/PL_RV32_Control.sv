@@ -73,6 +73,8 @@ module PL_RV32_Controller(
 
     always_comb begin
         case(id_if.opcode)
+            MEM_STORE_OP:
+                alu_op = ALU_ADD;
             IMMED_ARITH:
                 case(id_if.funct3)
                     3'h0:
