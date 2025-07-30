@@ -80,6 +80,8 @@ module PL_RV32_Controller(
                     3'h0:
                         alu_op = ALU_ADD;
                 endcase
+            LUI:
+                alu_op = ALU_PASS_B;
             default
                 alu_op = ALU_ADD;
         endcase
@@ -89,7 +91,7 @@ module PL_RV32_Controller(
     assign mem_write_en = (id_if.opcode == MEM_STORE_OP) ? 1'b1 : 1'b0;
 
     assign write_back_sel = (id_if.opcode == MEM_LOAD_OP ) ? 1'b1 : 1'b0;
-    assign reg_write_en = (id_if.opcode == MEM_LOAD_OP || id_if.opcode == IMMED_ARITH ) ? 1'b1 : 1'b0;
+    assign reg_write_en = (id_if.opcode == MEM_LOAD_OP || id_if.opcode == IMMED_ARITH || id_if.opcode == LUI) ? 1'b1 : 1'b0;
 
 
 endmodule
