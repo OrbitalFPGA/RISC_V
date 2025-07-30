@@ -116,5 +116,10 @@ package rv32_pipeline_pkg;
     reg_addr_t  rd;
   } mem_wb_t;
 
+  typedef enum logic [1:0] {
+      FWD_NONE = 2'b00,
+      FWD_MEM  = 2'b01,
+      FWD_WB   = 2'b10
+  } forward_sel_t;
 
 endpackage

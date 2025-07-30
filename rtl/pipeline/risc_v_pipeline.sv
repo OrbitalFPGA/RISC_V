@@ -124,33 +124,66 @@ module risc_v_pipeline(
 
     // Execute
 
+    forward_sel_t fwd_rs1;
+    forward_sel_t fwd_rs2;
+
+
     word_t alu_result;
     logic zero_result;
 
     word_t operand_a;
+    word_t fwd_operand_a;
     word_t operand_b;
+    word_t fwd_operand_b;
+
 
     ALU alu(.clk(clk), .rst_n(rst_n), .operand_a(operand_a), .operand_b(operand_b), .opcode(id_ex_reg.alu_code), .result(alu_result), .zero(zero_result));
     
     always_comb begin
         case(id_ex_reg.operand_a_select)
             REGISTER_A:
-                operand_a = id_ex_reg.rs1_data;
+                operand_a = fwd_operand_a;
             default:
-                operand_a = id_ex_reg.rs1_data;
+                operand_a = fwd_operand_a;
+        endcase
+    end
+
+    always_comb begin
+        case(fwd_rs1)
+            FWD_NONE:
+                fwd_operand_a = id_ex_reg.rs1_data;
+            FWD_MEM:
+                fwd_operand_a = ex_mem_reg.alu_result;
+            FWD_WB:
+                fwd_operand_a = mem_wb_reg.reg_store_value;
+            default:
+                fwd_operand_a = id_ex_reg.rs1_data;
+        endcase
+    end
+
+    always_comb begin
+        case(fwd_rs1)
+            FWD_NONE:
+                fwd_operand_b = id_ex_reg.rs2_data;
+            FWD_MEM:
+                fwd_operand_b = ex_mem_reg.alu_result;
+            FWD_WB:
+                fwd_operand_b = mem_wb_reg.reg_store_value;
+            default:
+                fwd_operand_b = id_ex_reg.rs2_data;
         endcase
     end
 
     always_comb begin
         case(id_ex_reg.operand_b_select)
             REGISTER_B:
-                operand_b = id_ex_reg.rs2_data;
+                operand_b = fwd_operand_b;
             IMMEDIATE:
                 operand_b = id_ex_reg.immediateValue;
             ZERO:
                 operand_b = 32'b0;
             default:
-                operand_b = id_ex_reg.rs2_data;
+                operand_b = fwd_operand_b;
         endcase
     end
 
@@ -192,5 +225,16 @@ module risc_v_pipeline(
 
     // Write-Back
 
+    Hazard_Unit hazard_unit(
+        .id_rs1(id_ex_reg.rs1),
+        .id_rs2(id_ex_reg.rs2),
+        .mem_rd(ex_mem_reg.rd),
+        .wb_rd(mem_wb_reg.rd),
+        .mem_regwrite(ex_mem_reg.regFile_we),
+        .wb_regwrite(mem_wb_reg.regFile_we),
+
+        .forward_rs1(fwd_rs1),
+        .forward_rs2(fwd_rs2)
+        );
     
 endmodule
