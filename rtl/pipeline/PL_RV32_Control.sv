@@ -76,10 +76,12 @@ module PL_RV32_Controller(
             MEM_STORE_OP:
                 alu_op = ALU_ADD;
             IMMED_ARITH:
-                case(id_if.funct3)
-                    3'h0:
-                        alu_op = ALU_ADD;
-                endcase
+                // case(id_if.funct3)
+                    // 3'h0:
+                        // alu_op = ALU_ADD;
+                    // 3'h1:
+                        alu_op = ALU_SUB;
+                // endcase
             LUI:
                 alu_op = ALU_PASS_B;
             default

@@ -33,13 +33,22 @@ module risc_v_pipeline(
     // Instruction Fetch
 
     if_id_t if_id_reg;
+    
+    logic pc_stall;
+    logic if_id_stall;
+    logic if_id_bubble;
 
     always_ff @(posedge clk) begin
         if(!rst_n)
             if_id_reg <= '0;
         else begin
-            if_id_reg.instruction <= instruction;
-            if_id_reg.pc <= pc;
+            if(!if_id_stall) begin
+                if_id_reg.instruction <= instruction;
+                if_id_reg.pc <= pc;
+            end else if(if_id_bubble) begin
+                if_id_reg.instruction <= 32'h00100093; // ADDI x0 x0 0x0
+                if_id_reg.pc <= pc;
+            end
         end
     end
 
@@ -52,7 +61,7 @@ module risc_v_pipeline(
     always_ff @(posedge clk)
         if(!rst_n)
             pc <= PC_RESET_VALUE;
-        else
+        else if (!pc_stall)
             pc <= pc_next;
 
     // Instruction Decode
@@ -98,35 +107,59 @@ module risc_v_pipeline(
 
     id_ex_t id_ex_reg;
 
-    always_ff @(posedge clk) begin
-        if(!rst_n)
-            id_ex_reg <= '0;
-        else begin
-            id_ex_reg.rs1 <= id_if.rs1;
-            id_ex_reg.rs1_data <= rs1_data;
-            id_ex_reg.rs2 <= id_if.rs2;
-            id_ex_reg.rs2_data <= rs2_data;
-            id_ex_reg.rd <= id_if.rd;
-
-            id_ex_reg.immediateValue <= immediateValue;
-
-            id_ex_reg.alu_code <= alu_op;
-            id_ex_reg.operand_a_select <= alu_src_a_sel;
-            id_ex_reg.operand_b_select <= alu_src_b_sel;
-            
-            
-            id_ex_reg.regFile_we <= reg_write_en;
-            id_ex_reg.mem_read_en <= id_mem_read_en;
-            id_ex_reg.mem_write_en <= id_mem_write_en;
-            id_ex_reg.write_back_sel <= write_back_sel;
-        end
-    end
-
-    // Execute
+    logic id_ex_stall;
+    logic id_ex_bubble;
 
     forward_sel_t fwd_rs1;
     forward_sel_t fwd_rs2;
 
+    always_ff @(posedge clk) begin
+        if(!rst_n)
+            id_ex_reg <= '0;
+        else begin
+            if(!id_ex_stall) begin
+                id_ex_reg.rs1 <= id_if.rs1;
+                id_ex_reg.rs1_data <= rs1_data;
+                id_ex_reg.rs2 <= id_if.rs2;
+                id_ex_reg.rs2_data <= rs2_data;
+                id_ex_reg.rd <= id_if.rd;
+
+                id_ex_reg.immediateValue <= immediateValue;
+
+                id_ex_reg.alu_code <= alu_op;
+                id_ex_reg.operand_a_select <= alu_src_a_sel;
+                id_ex_reg.operand_b_select <= alu_src_b_sel;
+                
+                
+                id_ex_reg.regFile_we <= reg_write_en;
+                id_ex_reg.mem_read_en <= id_mem_read_en;
+                id_ex_reg.mem_write_en <= id_mem_write_en;
+                id_ex_reg.write_back_sel <= write_back_sel;
+                id_ex_reg.fwd_rs1 <= fwd_rs1;
+                id_ex_reg.fwd_rs2 <= fwd_rs2;
+            end else if (id_ex_bubble) begin
+                id_ex_reg.rs1 <= 5'b0;
+                id_ex_reg.rs1_data <= 32'b0;
+                id_ex_reg.rs2 <= 5'b0;
+                id_ex_reg.rs2_data <= 32'b0;
+                id_ex_reg.rd <= 5'b0;
+
+                id_ex_reg.immediateValue <= 32'h0;
+
+                id_ex_reg.alu_code <= ALU_ADD;
+                id_ex_reg.operand_a_select <= REGISTER_A;
+                id_ex_reg.operand_b_select <= IMMEDIATE;
+                
+                
+                id_ex_reg.regFile_we <= 1'b0;
+                id_ex_reg.mem_read_en <= 1'b0;
+                id_ex_reg.mem_write_en <= 1'b0;
+                id_ex_reg.write_back_sel <= 1'b0;
+            end
+        end
+    end
+
+    // Execute
 
     word_t alu_result;
     logic zero_result;
@@ -149,7 +182,7 @@ module risc_v_pipeline(
     end
 
     always_comb begin
-        case(fwd_rs1)
+        case(id_ex_reg.fwd_rs1)
             FWD_NONE:
                 fwd_operand_a = id_ex_reg.rs1_data;
             FWD_MEM:
@@ -162,7 +195,7 @@ module risc_v_pipeline(
     end
 
     always_comb begin
-        case(fwd_rs1)
+        case(id_ex_reg.fwd_rs2)
             FWD_NONE:
                 fwd_operand_b = id_ex_reg.rs2_data;
             FWD_MEM:
@@ -193,13 +226,12 @@ module risc_v_pipeline(
         if(!rst_n)
             ex_mem_reg <= '0;
         else begin
-            ex_mem_reg.alu_result <= alu_result;
-            ex_mem_reg.regFile_we <= id_ex_reg.regFile_we;
-            ex_mem_reg.rd <= id_ex_reg.rd;
-            ex_mem_reg.mem_store_value <= id_ex_reg.rs2_data;
-            ex_mem_reg.mem_write_en <= id_ex_reg.mem_write_en;
-            ex_mem_reg.mem_read_en <= id_ex_reg.mem_read_en;
-
+                ex_mem_reg.alu_result <= alu_result;
+                ex_mem_reg.regFile_we <= id_ex_reg.regFile_we;
+                ex_mem_reg.rd <= id_ex_reg.rd;
+                ex_mem_reg.mem_store_value <= id_ex_reg.rs2_data;
+                ex_mem_reg.mem_write_en <= id_ex_reg.mem_write_en;
+                ex_mem_reg.mem_read_en <= id_ex_reg.mem_read_en;
         end
     end
 
@@ -226,15 +258,22 @@ module risc_v_pipeline(
     // Write-Back
 
     Hazard_Unit hazard_unit(
-        .id_rs1(id_ex_reg.rs1),
-        .id_rs2(id_ex_reg.rs2),
-        .mem_rd(ex_mem_reg.rd),
-        .wb_rd(mem_wb_reg.rd),
-        .mem_regwrite(ex_mem_reg.regFile_we),
-        .wb_regwrite(mem_wb_reg.regFile_we),
+        .id_rs1(id_if.rs1),
+        .id_rs2(id_if.rs2),
+        .mem_rd(id_ex_reg.rd),
+        .wb_rd(ex_mem_reg.rd),
+        .mem_regwrite(id_ex_reg.regFile_we),
+        .wb_regwrite(ex_mem_reg.regFile_we),
 
         .forward_rs1(fwd_rs1),
-        .forward_rs2(fwd_rs2)
+        .forward_rs2(fwd_rs2),
+
+        .mem_read(ex_mem_reg.mem_write_en),
+        .pc_stall(pc_stall),
+        .if_id_stall(if_id_stall),
+        .id_ex_stall(id_ex_stall),
+        .if_id_bubble(if_id_bubble),
+        .id_ex_bubble(id_ex_bubble)
         );
     
 endmodule

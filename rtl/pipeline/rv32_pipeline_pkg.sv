@@ -84,6 +84,11 @@ package rv32_pipeline_pkg;
   typedef logic [4:0] reg_addr_t;
   typedef logic [31:0] word_t;
 
+    typedef enum logic [1:0] {
+      FWD_NONE = 2'b00,
+      FWD_MEM  = 2'b01,
+      FWD_WB   = 2'b10
+  } forward_sel_t;
 
   typedef struct packed {
     word_t            rs1_data        ;
@@ -99,6 +104,8 @@ package rv32_pipeline_pkg;
     logic             mem_read_en     ;
     logic             mem_write_en    ;
     logic             write_back_sel  ;
+    forward_sel_t     fwd_rs1;
+    forward_sel_t     fwd_rs2; 
   } id_ex_t;
 
   typedef struct packed {
@@ -116,10 +123,6 @@ package rv32_pipeline_pkg;
     reg_addr_t  rd;
   } mem_wb_t;
 
-  typedef enum logic [1:0] {
-      FWD_NONE = 2'b00,
-      FWD_MEM  = 2'b01,
-      FWD_WB   = 2'b10
-  } forward_sel_t;
+
 
 endpackage

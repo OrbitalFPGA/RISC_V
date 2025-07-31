@@ -25,6 +25,6 @@ interface instruction_decode_if;
   end
 
   modport input_side (input instruction, output rs1, rs2, rd);
-  modport decode_side (output funct3, funct7, opcode);
+  modport decode_side (input funct3, funct7, opcode);
 
 endinterface //instruction_decode_if
