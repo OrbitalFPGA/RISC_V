@@ -71,17 +71,42 @@ module PL_RV32_Controller(
 
     assign alu_src_b_sel = IMMEDIATE;
 
+    ALU_OPCODE arithmetic_opcode;
+
+    always_comb begin
+        case (id_if.funct3)
+            3'h0:
+                arithmetic_opcode = ALU_ADD;
+            3'h1:
+                if (id_if.funct7 == 7'h0)
+                    arithmetic_opcode = ALU_SLL;
+            3'h2:
+                arithmetic_opcode = ALU_SLT;
+            3'h3:
+                arithmetic_opcode = ALU_SLTU;
+            3'h4:
+                arithmetic_opcode = ALU_XOR;
+            3'h5:
+                if(id_if.funct7 == 7'h0)
+                    arithmetic_opcode = ALU_SRL;
+                else if(id_if.funct7 == 7'h20)
+                    arithmetic_opcode = ALU_SRA;
+            3'h6:
+                arithmetic_opcode = ALU_OR;
+            3'h7:
+                arithmetic_opcode = ALU_AND;
+            default: arithmetic_opcode = ALU_ADD;
+        endcase
+    end
+
     always_comb begin
         case(id_if.opcode)
             MEM_STORE_OP:
                 alu_op = ALU_ADD;
+            MEM_STORE_OP:
+                alu_op = ALU_ADD;
             IMMED_ARITH:
-                // case(id_if.funct3)
-                    // 3'h0:
-                        // alu_op = ALU_ADD;
-                    // 3'h1:
-                        alu_op = ALU_SUB;
-                // endcase
+                alu_op = arithmetic_opcode;
             LUI:
                 alu_op = ALU_PASS_B;
             default

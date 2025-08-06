@@ -29,6 +29,9 @@ module risc_v_pipeline(
 
     input wire word_t mem_read_data;
     output logic mem_read_en;
+    
+    (* max_fanout = 32 *) logic rst;
+    assign rst = ~rst_n;
 
     // Instruction Fetch
 
@@ -39,7 +42,7 @@ module risc_v_pipeline(
     logic if_id_bubble;
 
     always_ff @(posedge clk) begin
-        if(!rst_n)
+        if(rst)
             if_id_reg <= '0;
         else begin
             if(!if_id_stall) begin
@@ -59,7 +62,7 @@ module risc_v_pipeline(
     end
 
     always_ff @(posedge clk)
-        if(!rst_n)
+        if(rst)
             pc <= PC_RESET_VALUE;
         else if (!pc_stall)
             pc <= pc_next;
@@ -82,7 +85,7 @@ module risc_v_pipeline(
 
     PL_RV32_Controller controller(
         .clk(clk),
-        .rst_n(rst_n),
+        .rst_n(rst),
         .id_if(id_if),
         .alu_op(alu_op),
         .alu_src_a_sel(alu_src_a_sel),
@@ -114,7 +117,7 @@ module risc_v_pipeline(
     forward_sel_t fwd_rs2;
 
     always_ff @(posedge clk) begin
-        if(!rst_n)
+        if(rst)
             id_ex_reg <= '0;
         else begin
             if(!id_ex_stall) begin
@@ -137,6 +140,8 @@ module risc_v_pipeline(
                 id_ex_reg.write_back_sel <= write_back_sel;
                 id_ex_reg.fwd_rs1 <= fwd_rs1;
                 id_ex_reg.fwd_rs2 <= fwd_rs2;
+                
+                id_ex_reg.instruction <= if_id_reg.instruction;
             end else if (id_ex_bubble) begin
                 id_ex_reg.rs1 <= 5'b0;
                 id_ex_reg.rs1_data <= 32'b0;
@@ -155,6 +160,7 @@ module risc_v_pipeline(
                 id_ex_reg.mem_read_en <= 1'b0;
                 id_ex_reg.mem_write_en <= 1'b0;
                 id_ex_reg.write_back_sel <= 1'b0;
+                id_ex_reg.instruction <= 32'h00000013;
             end
         end
     end
@@ -170,7 +176,7 @@ module risc_v_pipeline(
     word_t fwd_operand_b;
 
 
-    ALU alu(.clk(clk), .rst_n(rst_n), .operand_a(operand_a), .operand_b(operand_b), .opcode(id_ex_reg.alu_code), .result(alu_result), .zero(zero_result));
+    ALU alu(.clk(clk), .rst_n(rst), .operand_a(operand_a), .operand_b(operand_b), .opcode(id_ex_reg.alu_code), .result(alu_result), .zero(zero_result));
     
     always_comb begin
         case(id_ex_reg.operand_a_select)
@@ -221,17 +227,29 @@ module risc_v_pipeline(
     end
 
     ex_mem_t ex_mem_reg;
+    logic ex_mem_bubble;
 
     always_ff @(posedge clk) begin
-        if(!rst_n)
+        if(rst)
             ex_mem_reg <= '0;
         else begin
-                ex_mem_reg.alu_result <= alu_result;
-                ex_mem_reg.regFile_we <= id_ex_reg.regFile_we;
-                ex_mem_reg.rd <= id_ex_reg.rd;
-                ex_mem_reg.mem_store_value <= id_ex_reg.rs2_data;
-                ex_mem_reg.mem_write_en <= id_ex_reg.mem_write_en;
-                ex_mem_reg.mem_read_en <= id_ex_reg.mem_read_en;
+                if(ex_mem_bubble) begin
+                    ex_mem_reg.alu_result <= 32'h0;
+                    ex_mem_reg.regFile_we <= 1'b0;
+                    ex_mem_reg.rd <= 5'b0;
+                    ex_mem_reg.mem_store_value <= 32'h0;
+                    ex_mem_reg.mem_write_en <= 32'h0;
+                    ex_mem_reg.mem_read_en <= 32'h0;
+                    ex_mem_reg.instruction <= 32'h00000013;
+                end else begin
+                    ex_mem_reg.alu_result <= alu_result;
+                    ex_mem_reg.regFile_we <= id_ex_reg.regFile_we;
+                    ex_mem_reg.rd <= id_ex_reg.rd;
+                    ex_mem_reg.mem_store_value <= id_ex_reg.rs2_data;
+                    ex_mem_reg.mem_write_en <= id_ex_reg.mem_write_en;
+                    ex_mem_reg.mem_read_en <= id_ex_reg.mem_read_en;
+                    ex_mem_reg.instruction <= id_ex_reg.instruction;
+                end
         end
     end
 
@@ -239,41 +257,68 @@ module risc_v_pipeline(
 
         word_t store_value;
 
-        assign store_value = ex_mem_reg.alu_result;
+        assign store_value = (ex_mem_reg.mem_read_en == 1'b1) ? mem_read_data : ex_mem_reg.alu_result;
         assign mem_address = ex_mem_reg.alu_result;
         assign mem_write_data = ex_mem_reg.mem_store_value;
         assign mem_write_en = ex_mem_reg.mem_write_en;
         assign mem_read_en = ex_mem_reg.mem_read_en;
 
         always_ff @(posedge clk) begin
-            if(!rst_n)
+            if(rst)
                 mem_wb_reg <= '0;
             else begin
                 mem_wb_reg.reg_store_value <= store_value;
                 mem_wb_reg.regFile_we <= ex_mem_reg.regFile_we;
                 mem_wb_reg.rd <= ex_mem_reg.rd;
+                mem_wb_reg.instruction <= ex_mem_reg.instruction;
             end
         end
 
     // Write-Back
 
+//    Hazard_Unit hazard_unit(
+//        .clk(clk),
+//        .id_rs1(id_if.rs1),
+//        .id_rs2(id_if.rs2),
+//        .ex_rd(id_ex_reg.rd),
+//        .mem_rd(ex_mem_reg.rd),
+//        .ex_regwrite(id_ex_reg.regFile_we),
+//        .mem_regwrite(ex_mem_reg.regFile_we),
+
+//        .forward_rs1(fwd_rs1),
+//        .forward_rs2(fwd_rs2),
+
+//        .ex_mem_read(id_ex_reg.mem_read_en),
+//        .pc_stall(pc_stall),
+//        .if_id_stall(if_id_stall),
+//        .id_ex_stall(id_ex_stall),
+//        .if_id_bubble(if_id_bubble),
+//        .id_ex_bubble(id_ex_bubble),
+//        .ex_mem_bubble(ex_mem_bubble)
+//        );
+
     Hazard_Unit hazard_unit(
-        .id_rs1(id_if.rs1),
-        .id_rs2(id_if.rs2),
-        .mem_rd(id_ex_reg.rd),
-        .wb_rd(ex_mem_reg.rd),
-        .mem_regwrite(id_ex_reg.regFile_we),
-        .wb_regwrite(ex_mem_reg.regFile_we),
-
-        .forward_rs1(fwd_rs1),
-        .forward_rs2(fwd_rs2),
-
-        .mem_read(ex_mem_reg.mem_write_en),
+        .clk(clk),
+        .rst_n(rst),
+        .if_id_rs1(id_if.rs1),
+        .if_id_rs2(id_if.rs2),
+         
+        .id_ex_rd(id_ex_reg.rd),
+        .ex_mem_rd(ex_mem_reg.rd),
+        .id_ex_regwrite(id_ex_reg.regFile_we),
+        .ex_mem_regwrite(ex_mem_reg.regFile_we),
+    
+        .id_ex_mem_read_en(id_ex_reg.mem_read_en),
+    
         .pc_stall(pc_stall),
         .if_id_stall(if_id_stall),
         .id_ex_stall(id_ex_stall),
-        .if_id_bubble(if_id_bubble),
-        .id_ex_bubble(id_ex_bubble)
-        );
+    
+        .ex_mem_bubble(ex_mem_bubble),
+        .id_ex_bubble(id_ex_bubble),
+        
+        .forward_rs1(fwd_rs1),
+        .forward_rs2(fwd_rs2)
+    );
     
 endmodule

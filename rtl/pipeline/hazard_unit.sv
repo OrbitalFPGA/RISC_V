@@ -1,70 +1,94 @@
 import rv32_pipeline_pkg::*;
 
 module Hazard_Unit (
-    id_rs1,
-    id_rs2,
-    mem_rd,
-    wb_rd,
-    mem_regwrite,
-    wb_regwrite,
+    clk,
+    rst_n,
+    if_id_rs1,
+    if_id_rs2,
 
-    mem_read,
+    id_ex_rd,
+    ex_mem_rd,
+    id_ex_regwrite,
+    ex_mem_regwrite,
 
-    forward_rs1,
-    forward_rs2,
+    id_ex_mem_read_en,
 
     pc_stall,
     if_id_stall,
     id_ex_stall,
 
-    if_id_bubble,
-    id_ex_bubble
-    // input  wire reg_addr_t  id_rs1,
-    // input  wire reg_addr_t  id_rs2,
-    // input  wire reg_addr_t  ex_rd,
-    // input  logic            ex_regwrite,
-    // input  wire reg_addr_t  mem_rd,
-    // input  logic            mem_regwrite,
-    // input  logic            ex_mem_read,  // for load-use hazard
-    // output logic            stall,
-    // output logic            forward_mem_data,
-    // output logic            forward_wb_data,
+    id_ex_bubble,
+    ex_mem_bubble,
 
-    // input word_t            mem_rd_data;
-    // input word_t            wb_rd_data; 
+    forward_rs1,
+    forward_rs2
 );
+    input wire logic clk;
+    input wire logic rst_n;
+    input wire reg_addr_t if_id_rs1;
+    input wire reg_addr_t if_id_rs2;
 
-    input wire reg_addr_t id_rs1;
-    input wire reg_addr_t id_rs2;
-    input wire reg_addr_t mem_rd;
-    input wire reg_addr_t wb_rd;
-
-    input wire logic mem_regwrite;
-    input wire logic wb_regwrite;
-
-    input wire logic mem_read;
-
-    output forward_sel_t forward_rs1;
-    output forward_sel_t forward_rs2;
+    input wire reg_addr_t id_ex_rd;
+    input wire reg_addr_t ex_mem_rd;
+    input wire logic id_ex_regwrite;
+    input wire logic ex_mem_regwrite;
     
+    input wire logic id_ex_mem_read_en;
+
     output logic pc_stall;
     output logic if_id_stall;
     output logic id_ex_stall;
 
-    output logic if_id_bubble;
     output logic id_ex_bubble;
+    output logic ex_mem_bubble;
     
+    output forward_sel_t forward_rs1;
+    output forward_sel_t forward_rs2;
+    /*
+    Load Use
+        instruction[n] is a load instruction to load data d, instruction[n+1] uses data d
+        data d is not available until write back. 
+        stall instruction fetch, instructin decode and execute (pc, if_id_reg, id_ex_reg keeps previous value) when instruction[n] is in mem stage
+        add NOP bubble into ex_mem_reg
+        determine Load Use Hazard: rd in ex (id_ex_reg) matches rs1 or rs2 in id (if_id_reg) and id_ex_reg.mem_read_en is 1'b1
+            need to delay 1 clock cycle
+    */
+    logic load_use_next;
+    logic load_use;
+    always_comb begin
+        load_use_next = 1'b0;
+        if(id_ex_rd == if_id_rs1 || id_ex_rd == if_id_rs1)
+            if(id_ex_mem_read_en)
+                load_use_next = 1'b1;
+            else
+                load_use_next = 1'b0;
+        else
+            load_use_next = 1'b0;
+    end
+    always_ff @(posedge clk) begin
+        if(rst_n)
+            load_use <= 1'b0;
+        else 
+            load_use <= load_use_next;
+    end
 
-    // Need to forward when rd is written to and rd == rs1 and/or rd == rs2
-    // If mem_rd == wb_rd, forward mem_rd value
+    assign pc_stall = (load_use) ? 1'b1 : 0;
+    assign if_id_stall = (load_use) ? 1'b1 : 0;
+    assign id_ex_stall = (load_use) ? 1'b1 : 0;
+    assign ex_mem_bubble = (load_use) ? 1'b1 : 0;
+    assign id_ex_bubble = 0;
+        // Need to forward when rd is written to and rd == rs1 and/or rd == rs2
+    // If ex_rd == mem_rd, forward ex_rd value
 
     // Check to see if rs1 needs to be replaced with data from mem or wb
     always_comb begin
         forward_rs1 = FWD_NONE;
-       if (id_rs1 != 5'b0) begin
-           if(id_rs1 == mem_rd && mem_regwrite && !mem_read)
+       if (if_id_rs1 != 5'b0) begin
+           if(if_id_rs1 == id_ex_rd && id_ex_mem_read_en)
+               forward_rs1 = FWD_WB;
+           else if(if_id_rs1 == id_ex_rd && id_ex_regwrite)
                forward_rs1 = FWD_MEM;
-           else if (id_rs1 == wb_rd && wb_regwrite)
+           else if (if_id_rs1 == ex_mem_rd && ex_mem_regwrite)
                forward_rs1 = FWD_WB;
        end
     end
@@ -72,19 +96,14 @@ module Hazard_Unit (
     // Check to see if rs2 needs to be replaced with data from mem or wb
     always_comb begin
         forward_rs2 = FWD_NONE;
-       if (id_rs2 != 5'b0) begin
-           if(id_rs2 == mem_rd && mem_regwrite && !mem_read)
+       if (if_id_rs2 != 5'b0) begin
+           if(if_id_rs2 == id_ex_rd && id_ex_mem_read_en)
+               forward_rs2 = FWD_WB;
+           if(if_id_rs2 == id_ex_rd && id_ex_regwrite)
                forward_rs2 = FWD_MEM;
-           else if (id_rs2 == wb_rd && wb_regwrite)
+           else if (if_id_rs2 == ex_mem_rd && ex_mem_regwrite)
                forward_rs2 = FWD_WB;
        end
     end
-
-    assign pc_stall = (mem_read)    ? 1'b0 : 1'b0;
-    assign if_id_stall = (mem_read) ? 1'b0 : 1'b0;
-    assign id_ex_stall = (mem_read) ? 1'b0 : 1'b0;
-
-    assign if_id_bubble = 0;
-    assign id_ex_bubble = (mem_read) ? 1'b0 : 1'b0;
 
 endmodule

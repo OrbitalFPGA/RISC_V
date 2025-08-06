@@ -106,6 +106,7 @@ package rv32_pipeline_pkg;
     logic             write_back_sel  ;
     forward_sel_t     fwd_rs1;
     forward_sel_t     fwd_rs2; 
+    word_t instruction;
   } id_ex_t;
 
   typedef struct packed {
@@ -115,12 +116,16 @@ package rv32_pipeline_pkg;
     logic             mem_write_en    ;
     logic       regFile_we;
     reg_addr_t  rd;
+    word_t instruction;
+
   } ex_mem_t;
 
   typedef struct packed {
     word_t      reg_store_value;
     logic       regFile_we;
     reg_addr_t  rd;
+    word_t instruction;
+
   } mem_wb_t;
 
 
