@@ -69,7 +69,17 @@ module PL_RV32_Controller(
         endcase
     end
 
-    assign alu_src_b_sel = IMMEDIATE;
+    // assign alu_src_b_sel = IMMEDIATE;
+    always_comb
+    begin
+        alu_src_b_sel = IMMEDIATE;
+        case(id_if.opcode)
+            ARITH:
+                alu_src_b_sel = REGISTER_B;
+            default:
+                alu_src_b_sel = IMMEDIATE;
+        endcase
+    end
 
     ALU_OPCODE arithmetic_opcode;
 
@@ -105,6 +115,8 @@ module PL_RV32_Controller(
                 alu_op = ALU_ADD;
             MEM_STORE_OP:
                 alu_op = ALU_ADD;
+            ARITH:
+                alu_op = arithmetic_opcode;
             IMMED_ARITH:
                 alu_op = arithmetic_opcode;
             LUI:
@@ -119,6 +131,18 @@ module PL_RV32_Controller(
 
     assign write_back_sel = (id_if.opcode == MEM_LOAD_OP ) ? 1'b1 : 1'b0;
     assign reg_write_en = (id_if.opcode == MEM_LOAD_OP || id_if.opcode == IMMED_ARITH || id_if.opcode == LUI) ? 1'b1 : 1'b0;
+    always_comb begin
+        case(id_if.opcode)
+            MEM_LOAD_OP:
+                reg_write_en = 1'b1;
+            ARITH:
+                reg_write_en = 1'b1;
+            IMMED_ARITH:
+                reg_write_en = 1'b1;
+            LUI:
+                reg_write_en = 1'b1;
+        endcase
+    end
 
 
 endmodule
