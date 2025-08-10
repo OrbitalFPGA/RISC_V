@@ -120,7 +120,27 @@ module risc_v_pipeline(
         if(rst)
             id_ex_reg <= '0;
         else begin
-            if(!id_ex_stall) begin
+            if(id_ex_stall) begin
+            end else if (id_ex_bubble) begin
+                id_ex_reg.rs1 <= 5'b0;
+                id_ex_reg.rs1_data <= 32'b0;
+                id_ex_reg.rs2 <= 5'b0;
+                id_ex_reg.rs2_data <= 32'b0;
+                id_ex_reg.rd <= 5'b0;
+
+                id_ex_reg.immediateValue <= 32'h0;
+
+                id_ex_reg.alu_code <= ALU_ADD;
+                id_ex_reg.operand_a_select <= REGISTER_A;
+                id_ex_reg.operand_b_select <= IMMEDIATE;
+                
+                
+                id_ex_reg.regFile_we <= 1'b0;
+                id_ex_reg.mem_read_en <= 1'b0;
+                id_ex_reg.mem_write_en <= 1'b0;
+                id_ex_reg.write_back_sel <= 1'b0;
+                id_ex_reg.instruction <= 32'h00000013;
+            end else begin
                 id_ex_reg.rs1 <= id_if.rs1;
                 id_ex_reg.rs1_data <= rs1_data;
                 id_ex_reg.rs2 <= id_if.rs2;
@@ -142,25 +162,6 @@ module risc_v_pipeline(
                 id_ex_reg.fwd_rs2 <= fwd_rs2;
                 
                 id_ex_reg.instruction <= if_id_reg.instruction;
-            end else if (id_ex_bubble) begin
-                id_ex_reg.rs1 <= 5'b0;
-                id_ex_reg.rs1_data <= 32'b0;
-                id_ex_reg.rs2 <= 5'b0;
-                id_ex_reg.rs2_data <= 32'b0;
-                id_ex_reg.rd <= 5'b0;
-
-                id_ex_reg.immediateValue <= 32'h0;
-
-                id_ex_reg.alu_code <= ALU_ADD;
-                id_ex_reg.operand_a_select <= REGISTER_A;
-                id_ex_reg.operand_b_select <= IMMEDIATE;
-                
-                
-                id_ex_reg.regFile_we <= 1'b0;
-                id_ex_reg.mem_read_en <= 1'b0;
-                id_ex_reg.mem_write_en <= 1'b0;
-                id_ex_reg.write_back_sel <= 1'b0;
-                id_ex_reg.instruction <= 32'h00000013;
             end
         end
     end

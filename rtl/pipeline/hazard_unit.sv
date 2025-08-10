@@ -8,8 +8,10 @@ module Hazard_Unit (
 
     id_ex_rd,
     ex_mem_rd,
+    mem_wb_rd,
     id_ex_regwrite,
     ex_mem_regwrite,
+    mem_wb_regwrite,
 
     id_ex_mem_read_en,
 
@@ -30,8 +32,11 @@ module Hazard_Unit (
 
     input wire reg_addr_t id_ex_rd;
     input wire reg_addr_t ex_mem_rd;
+    input wire reg_addr_t mem_wb_rd;
     input wire logic id_ex_regwrite;
     input wire logic ex_mem_regwrite;
+    input wire logic mem_wb_regwrite;
+
     
     input wire logic id_ex_mem_read_en;
 
@@ -72,37 +77,50 @@ module Hazard_Unit (
             load_use <= load_use_next;
     end
 
-    assign pc_stall = (load_use) ? 1'b1 : 0;
-    assign if_id_stall = (load_use) ? 1'b1 : 0;
+    logic rst1_raw_hazard;
+    logic rst2_raw_hazard;
+    logic raw_hazard;
+    assign raw_hazard = rst1_raw_hazard | rst2_raw_hazard;
+
+    assign pc_stall = (load_use || raw_hazard) ? 1'b1 : 0;
+    assign if_id_stall = (load_use || raw_hazard) ? 1'b1 : 0;
     assign id_ex_stall = (load_use) ? 1'b1 : 0;
     assign ex_mem_bubble = (load_use) ? 1'b1 : 0;
-    assign id_ex_bubble = 0;
+    assign id_ex_bubble = (raw_hazard) ? 1'b1 : 0;;
         // Need to forward when rd is written to and rd == rs1 and/or rd == rs2
     // If ex_rd == mem_rd, forward ex_rd value
 
     // Check to see if rs1 needs to be replaced with data from mem or wb
     always_comb begin
         forward_rs1 = FWD_NONE;
+        rst1_raw_hazard = 1'b0;
        if (if_id_rs1 != 5'b0) begin
            if(if_id_rs1 == id_ex_rd && id_ex_mem_read_en)
-               forward_rs1 = FWD_WB;
+            //    forward_rs1 = FWD_WB;
+                rst1_raw_hazard = 1'b1;
            else if(if_id_rs1 == id_ex_rd && id_ex_regwrite)
-               forward_rs1 = FWD_MEM;
+            //    forward_rs1 = FWD_MEM;
+                rst1_raw_hazard = 1'b1;
            else if (if_id_rs1 == ex_mem_rd && ex_mem_regwrite)
-               forward_rs1 = FWD_WB;
+            //    forward_rs1 = FWD_WB;
+                rst1_raw_hazard = 1'b1;
        end
     end
     
     // Check to see if rs2 needs to be replaced with data from mem or wb
     always_comb begin
         forward_rs2 = FWD_NONE;
+        rst2_raw_hazard = 1'b0;
        if (if_id_rs2 != 5'b0) begin
            if(if_id_rs2 == id_ex_rd && id_ex_mem_read_en)
-               forward_rs2 = FWD_WB;
+            //    forward_rs2 = FWD_WB;
+               rst2_raw_hazard = 1'b1;
            if(if_id_rs2 == id_ex_rd && id_ex_regwrite)
-               forward_rs2 = FWD_MEM;
+            //    forward_rs2 = FWD_MEM;
+               rst2_raw_hazard = 1'b1;
            else if (if_id_rs2 == ex_mem_rd && ex_mem_regwrite)
-               forward_rs2 = FWD_WB;
+            //    forward_rs2 = FWD_WB;
+               rst2_raw_hazard = 1'b1;
        end
     end
 
