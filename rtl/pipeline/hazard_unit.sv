@@ -15,10 +15,13 @@ module Hazard_Unit (
 
     id_ex_mem_read_en,
 
+    branch_taken,
+
     pc_stall,
     if_id_stall,
     id_ex_stall,
 
+    if_id_bubble,
     id_ex_bubble,
     ex_mem_bubble,
 
@@ -40,10 +43,13 @@ module Hazard_Unit (
     
     input wire logic id_ex_mem_read_en;
 
+    input wire logic branch_taken;
+
     output logic pc_stall;
     output logic if_id_stall;
     output logic id_ex_stall;
 
+    output logic if_id_bubble;
     output logic id_ex_bubble;
     output logic ex_mem_bubble;
     
@@ -82,11 +88,12 @@ module Hazard_Unit (
     logic raw_hazard;
     assign raw_hazard = rst1_raw_hazard | rst2_raw_hazard;
 
-    assign pc_stall = (load_use || raw_hazard) ? 1'b1 : 0;
-    assign if_id_stall = (load_use || raw_hazard) ? 1'b1 : 0;
+    assign pc_stall = ((load_use || raw_hazard)) ? 1'b1 : 0;
+    assign if_id_stall = ((load_use || raw_hazard) ) ? 1'b1 : 0;
     assign id_ex_stall = (load_use) ? 1'b1 : 0;
+    assign if_id_bubble = (branch_taken) ? 1'b1 : 1'b0;
     assign ex_mem_bubble = (load_use) ? 1'b1 : 0;
-    assign id_ex_bubble = (raw_hazard) ? 1'b1 : 0;;
+    assign id_ex_bubble = (raw_hazard) ? 1'b1 : 0;
         // Need to forward when rd is written to and rd == rs1 and/or rd == rs2
     // If ex_rd == mem_rd, forward ex_rd value
 

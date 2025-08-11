@@ -14,6 +14,8 @@ module PL_RV32_Controller(
         write_back_sel,
         mem_addr_en,
         store_data_en,
+        is_branch,
+        funct3,
         csr_addr,
         csr_write_en,
         csr_illegal_access
@@ -36,6 +38,12 @@ module PL_RV32_Controller(
     output logic [11:0] csr_addr;
     output logic csr_write_en;
     input wire logic csr_illegal_access;
+
+    output logic is_branch;
+    output logic funct3;
+
+    assign funct3 = id_if.funct3;
+    assign is_branch = (id_if.opcode == BRANCH) ? 1'b1 : 1'b0;
 
     always_comb
     begin

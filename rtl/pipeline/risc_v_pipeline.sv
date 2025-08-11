@@ -45,12 +45,17 @@ module risc_v_pipeline(
         if(rst)
             if_id_reg <= '0;
         else begin
-            if(!if_id_stall) begin
+            if(if_id_stall) begin
+                if_id_reg.instruction <= if_id_reg.instruction;
+                if_id_reg.pc <= if_id_reg.pc;
+            end
+            else if(if_id_bubble) begin
+                if_id_reg.instruction <= 32'h00000013; // ADDI x0 x0 0x0
+                if_id_reg.pc <= pc;
+            end else if(!if_id_stall) begin
                 if_id_reg.instruction <= instruction;
                 if_id_reg.pc <= pc;
-            end else if(if_id_bubble) begin
-                if_id_reg.instruction <= 32'h00100093; // ADDI x0 x0 0x0
-                if_id_reg.pc <= pc;
+                
             end
         end
     end
@@ -61,10 +66,18 @@ module risc_v_pipeline(
         pc_next = pc + 4;
     end
 
+    logic branch_taken;
+    word_t branch_pc;
+
+
     always_ff @(posedge clk)
         if(rst)
             pc <= PC_RESET_VALUE;
-        else if (!pc_stall)
+        else if (pc_stall)
+            pc <= pc;
+        else if (branch_taken)
+            pc <= branch_pc;
+        else
             pc <= pc_next;
 
     // Instruction Decode
@@ -83,6 +96,9 @@ module risc_v_pipeline(
     logic id_mem_read_en;
     logic id_mem_write_en;
 
+    logic [2:0] funct3;
+    logic is_branch;
+
     PL_RV32_Controller controller(
         .clk(clk),
         .rst_n(rst),
@@ -94,7 +110,9 @@ module risc_v_pipeline(
         .write_back_sel(write_back_sel),
         .mem_read_en(id_mem_read_en),
         .mem_write_en(id_mem_write_en),
-        .reg_write_en(reg_write_en)
+        .reg_write_en(reg_write_en),
+        .is_branch(is_branch),
+        .funct3(funct3)
     );
 
     word_t rs1_data;
@@ -115,6 +133,24 @@ module risc_v_pipeline(
 
     forward_sel_t fwd_rs1;
     forward_sel_t fwd_rs2;
+
+
+    logic eq, lt, ltu;
+
+    assign eq = (rs1_data == rs2_data);
+    assign lt = ($signed(rs1_data) < $signed(rs2_data));
+    assign ltu = ($unsigned(rs1_data) < $unsigned(rs2_data));
+
+    assign branch_taken = is_branch & (
+        (funct3 == 3'b000 && eq)
+    );
+
+    word_t branch_imm;
+    assign branch_imm = {{19{if_id_reg.instruction[31]}}, if_id_reg.instruction[31], if_id_reg.instruction[7], if_id_reg.instruction[30:25], if_id_reg.instruction[11:8], 1'b0};
+
+    assign branch_pc = if_id_reg.pc + branch_imm;
+
+
 
     always_ff @(posedge clk) begin
         if(rst)
@@ -311,10 +347,13 @@ module risc_v_pipeline(
     
         .id_ex_mem_read_en(id_ex_reg.mem_read_en),
     
+        .branch_taken(branch_taken),
+
         .pc_stall(pc_stall),
         .if_id_stall(if_id_stall),
         .id_ex_stall(id_ex_stall),
     
+        .if_id_bubble(if_id_bubble),
         .ex_mem_bubble(ex_mem_bubble),
         .id_ex_bubble(id_ex_bubble),
         
