@@ -95,7 +95,10 @@ module PL_RV32_Controller(
         arithmetic_opcode = ALU_ADD;
         case (id_if.funct3)
             3'h0:
-                arithmetic_opcode = ALU_ADD;
+                if(id_if.funct7 == 7'h0)
+                    arithmetic_opcode = ALU_ADD;
+                else if(id_if.funct7 == 7'h20)
+                    arithmetic_opcode = ALU_SUB;
             3'h1:
                 if (id_if.funct7 == 7'h0)
                     arithmetic_opcode = ALU_SLL;
