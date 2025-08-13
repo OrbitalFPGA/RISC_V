@@ -107,6 +107,9 @@ package rv32_pipeline_pkg;
     forward_sel_t     fwd_rs1;
     forward_sel_t     fwd_rs2; 
     word_t instruction;
+
+    logic branch_taken;
+    word_t branch_pc;
   } id_ex_t;
 
   typedef struct packed {

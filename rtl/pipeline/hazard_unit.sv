@@ -93,7 +93,7 @@ module Hazard_Unit (
     assign id_ex_stall = (load_use) ? 1'b1 : 0;
     assign if_id_bubble = (branch_taken) ? 1'b1 : 1'b0;
     assign ex_mem_bubble = (load_use) ? 1'b1 : 0;
-    assign id_ex_bubble = (raw_hazard) ? 1'b1 : 0;
+    assign id_ex_bubble = (raw_hazard || branch_taken) ? 1'b1 : 0;
         // Need to forward when rd is written to and rd == rs1 and/or rd == rs2
     // If ex_rd == mem_rd, forward ex_rd value
 

@@ -92,6 +92,7 @@ module PL_RV32_Controller(
     ALU_OPCODE arithmetic_opcode;
 
     always_comb begin
+        arithmetic_opcode = ALU_ADD;
         case (id_if.funct3)
             3'h0:
                 arithmetic_opcode = ALU_ADD;
@@ -138,7 +139,7 @@ module PL_RV32_Controller(
     assign mem_write_en = (id_if.opcode == MEM_STORE_OP) ? 1'b1 : 1'b0;
 
     assign write_back_sel = (id_if.opcode == MEM_LOAD_OP ) ? 1'b1 : 1'b0;
-    assign reg_write_en = (id_if.opcode == MEM_LOAD_OP || id_if.opcode == IMMED_ARITH || id_if.opcode == LUI) ? 1'b1 : 1'b0;
+    // assign reg_write_en = (id_if.opcode == MEM_LOAD_OP || id_if.opcode == IMMED_ARITH || id_if.opcode == LUI) ? 1'b1 : 1'b0;
     always_comb begin
         case(id_if.opcode)
             MEM_LOAD_OP:
@@ -149,6 +150,8 @@ module PL_RV32_Controller(
                 reg_write_en = 1'b1;
             LUI:
                 reg_write_en = 1'b1;
+            default:
+                reg_write_en = 1'b0;
         endcase
     end
 

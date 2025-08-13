@@ -69,14 +69,17 @@ module risc_v_pipeline(
     logic branch_taken;
     word_t branch_pc;
 
+    id_ex_t id_ex_reg;
+
 
     always_ff @(posedge clk)
         if(rst)
             pc <= PC_RESET_VALUE;
         else if (pc_stall)
             pc <= pc;
-        else if (branch_taken)
-            pc <= branch_pc;
+        else if (id_ex_reg.branch_taken)
+           pc <= id_ex_reg.branch_pc;
+            // pc <= test_pc;
         else
             pc <= pc_next;
 
@@ -126,7 +129,6 @@ module risc_v_pipeline(
 
     ImmediateExtander immedExtand(.instruction(if_id_reg.instruction), .immediateSelect(imm_sel), .immediateValue(immediateValue));
 
-    id_ex_t id_ex_reg;
 
     logic id_ex_stall;
     logic id_ex_bubble;
@@ -137,7 +139,7 @@ module risc_v_pipeline(
 
     logic eq, lt, ltu;
 
-    assign eq = (rs1_data == rs2_data);
+    (* max_fanout = 8 *) assign eq = (rs1_data == rs2_data);
     assign lt = ($signed(rs1_data) < $signed(rs2_data));
     assign ltu = ($unsigned(rs1_data) < $unsigned(rs2_data));
 
@@ -149,6 +151,12 @@ module risc_v_pipeline(
     assign branch_imm = {{19{if_id_reg.instruction[31]}}, if_id_reg.instruction[31], if_id_reg.instruction[7], if_id_reg.instruction[30:25], if_id_reg.instruction[11:8], 1'b0};
 
     assign branch_pc = if_id_reg.pc + branch_imm;
+    word_t test_pc;
+    word_t test_branch_imm;
+    assign test_branch_imm = {{19{instruction[31]}}, instruction[31], instruction[7], instruction[30:25], instruction[11:8], 1'b0};
+    always_ff @(posedge clk) begin
+        test_pc = pc + test_branch_imm;
+    end
 
 
 
@@ -176,6 +184,10 @@ module risc_v_pipeline(
                 id_ex_reg.mem_write_en <= 1'b0;
                 id_ex_reg.write_back_sel <= 1'b0;
                 id_ex_reg.instruction <= 32'h00000013;
+
+                id_ex_reg.branch_taken <= 1'b0;
+                id_ex_reg.branch_pc <= 32'h0;
+
             end else begin
                 id_ex_reg.rs1 <= id_if.rs1;
                 id_ex_reg.rs1_data <= rs1_data;
@@ -198,6 +210,9 @@ module risc_v_pipeline(
                 id_ex_reg.fwd_rs2 <= fwd_rs2;
                 
                 id_ex_reg.instruction <= if_id_reg.instruction;
+
+                id_ex_reg.branch_taken <= branch_taken;
+                id_ex_reg.branch_pc <= branch_pc;
             end
         end
     end
@@ -347,7 +362,7 @@ module risc_v_pipeline(
     
         .id_ex_mem_read_en(id_ex_reg.mem_read_en),
     
-        .branch_taken(branch_taken),
+        .branch_taken(id_ex_reg.branch_taken),
 
         .pc_stall(pc_stall),
         .if_id_stall(if_id_stall),
