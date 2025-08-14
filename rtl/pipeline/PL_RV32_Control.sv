@@ -40,7 +40,7 @@ module PL_RV32_Controller(
     input wire logic csr_illegal_access;
 
     output logic is_branch;
-    output logic funct3;
+    output logic[2:0] funct3;
 
     assign funct3 = id_if.funct3;
     assign is_branch = (id_if.opcode == BRANCH) ? 1'b1 : 1'b0;
@@ -125,7 +125,7 @@ module PL_RV32_Controller(
         case(id_if.opcode)
             MEM_STORE_OP:
                 alu_op = ALU_ADD;
-            MEM_STORE_OP:
+            MEM_LOAD_OP:
                 alu_op = ALU_ADD;
             ARITH:
                 alu_op = arithmetic_opcode;

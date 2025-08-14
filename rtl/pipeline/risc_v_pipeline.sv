@@ -35,7 +35,7 @@ module risc_v_pipeline(
 
     // Instruction Fetch
 
-    if_id_t if_id_reg;
+    (* max_fanout = 16 *)if_id_t if_id_reg;
     
     logic pc_stall;
     logic if_id_stall;
@@ -139,12 +139,18 @@ module risc_v_pipeline(
 
     logic eq, lt, ltu;
 
-    (* max_fanout = 8 *) assign eq = (rs1_data == rs2_data);
+   (* max_fanout = 8 *) assign eq = (rs1_data == rs2_data);
     assign lt = ($signed(rs1_data) < $signed(rs2_data));
     assign ltu = ($unsigned(rs1_data) < $unsigned(rs2_data));
 
     assign branch_taken = is_branch & (
-        (funct3 == 3'b000 && eq)
+        (funct3 == 3'b000 && eq)   |
+        (funct3 == 3'b001 && !eq)  |
+        (funct3 == 3'b100 && lt)   |
+        (funct3 == 3'b101 && !lt)  |
+        (funct3 == 3'b110 && ltu)  |
+        (funct3 == 3'b111 && !ltu)  
+
     );
 
     word_t branch_imm;
