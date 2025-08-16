@@ -110,6 +110,13 @@ package rv32_pipeline_pkg;
 
     logic branch_taken;
     word_t branch_pc;
+
+    logic eq;
+    logic lt;
+    logic ltu;
+    logic [2:0] funct3;
+    logic is_branch;
+
   } id_ex_t;
 
   typedef struct packed {
